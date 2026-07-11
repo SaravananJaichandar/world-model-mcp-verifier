@@ -1,5 +1,5 @@
 {
-  "name": "@world-model-mcp/verifier",
+  "name": "world-model-mcp-verifier",
   "version": "0.13.0",
   "description": "Standalone reference verifier for the world-model-mcp v0.13+ tamper-evident audit log (TypeScript, byte-identical to the Python reference).",
   "type": "module",
