@@ -65,13 +65,13 @@ pytest
 Install:
 
 ```bash
-npm install @world-model-mcp/verifier
+npm install world-model-mcp-verifier
 ```
 
 Use:
 
 ```typescript
-import { verifyInclusionBundle } from "@world-model-mcp/verifier";
+import { verifyInclusionBundle } from "world-model-mcp-verifier";
 
 const bundle = /* prove_entry_inclusion response */;
 const ed25519PublicKey = hexToBytes(publicKeys.ed25519.public_key_hex);
