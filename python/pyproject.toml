@@ -1,0 +1,35 @@
+[project]
+name = "world-model-mcp-verifier"
+version = "0.13.0"
+description = "Standalone reference verifier for the world-model-mcp v0.13+ tamper-evident audit log"
+authors = [{name = "Saravanan Jaichandaran"}]
+readme = "../README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+keywords = ["mcp", "compliance", "audit", "merkle", "ed25519", "slh-dsa", "post-quantum"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Legal Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+]
+
+dependencies = [
+    "cryptography>=42.0.0",
+    "pyspx>=0.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/world_model_verifier"]

@@ -1,0 +1,46 @@
+[
+  {
+    "input": {},
+    "expected_hex": "7b7d"
+  },
+  {
+    "input": {
+      "a": 1,
+      "b": 2
+    },
+    "expected_hex": "7b2261223a312c2262223a327d"
+  },
+  {
+    "input": {
+      "z": 1,
+      "a": 2,
+      "m": 3
+    },
+    "expected_hex": "7b2261223a322c226d223a332c227a223a317d"
+  },
+  {
+    "input": {
+      "outer": {
+        "z": 1,
+        "a": 2
+      }
+    },
+    "expected_hex": "7b226f75746572223a7b2261223a322c227a223a317d7d"
+  },
+  {
+    "input": {
+      "strings": [
+        "c",
+        "b",
+        "a"
+      ]
+    },
+    "expected_hex": "7b22737472696e6773223a5b2263222c2262222c2261225d7d"
+  },
+  {
+    "input": {
+      "unicode": "h\u00e9llo"
+    },
+    "expected_hex": "7b22756e69636f6465223a2268c3a96c6c6f227d"
+  }
+]

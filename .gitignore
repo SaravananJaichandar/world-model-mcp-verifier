@@ -1,0 +1,15 @@
+node_modules/
+dist/
+python/dist/
+python/build/
+python/*.egg-info/
+python/src/*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+*.log
+.env
+canonical_check.mjs
+sig_check.mjs
+interop_check.mjs
