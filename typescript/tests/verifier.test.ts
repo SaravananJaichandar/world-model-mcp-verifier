@@ -118,26 +118,26 @@ describe("inclusion bundle vector", () => {
   const edPub = hexToBytes(vector.operator_public_keys.ed25519_hex);
   const slhPub = hexToBytes(vector.operator_public_keys.slh_dsa_hex);
 
-  it("full bundle verifies", () => {
-    const result = verifyInclusionBundle(vector.bundle, edPub, slhPub);
+  it("full bundle verifies", async () => {
+    const result = await verifyInclusionBundle(vector.bundle, edPub, slhPub);
     expect(result.ok).toBe(true);
     expect(result.reason).toBeUndefined();
   });
 
-  it("tampered row_hash fails", () => {
+  it("tampered row_hash fails", async () => {
     const tampered = JSON.parse(JSON.stringify(vector.bundle));
     tampered.row_hash = "sha256:" + "00".repeat(32);
-    const result = verifyInclusionBundle(tampered, edPub, slhPub);
+    const result = await verifyInclusionBundle(tampered, edPub, slhPub);
     expect(result.ok).toBe(false);
     expect(result.reason?.toLowerCase()).toContain("inclusion");
   });
 
-  it("stripped slh_dsa half is rejected", () => {
+  it("stripped slh_dsa half is rejected", async () => {
     // Attacker sets the PQ half to null hoping the verifier falls back
     // to Ed25519-only. The verifier MUST reject.
     const tampered = JSON.parse(JSON.stringify(vector.bundle));
     tampered.epoch_chain[0].signature_envelope.slh_dsa = null;
-    const result = verifyInclusionBundle(tampered, edPub, slhPub);
+    const result = await verifyInclusionBundle(tampered, edPub, slhPub);
     expect(result.ok).toBe(false);
     expect(result.reason?.toLowerCase()).toContain("signature");
   });

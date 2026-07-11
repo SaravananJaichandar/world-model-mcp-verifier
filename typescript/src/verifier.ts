@@ -79,11 +79,11 @@ export interface VerifyResult {
  * Returns { ok: true } on success. On failure, { ok: false, reason }
  * with a specific human-readable diagnostic.
  */
-export function verifyInclusionBundle(
+export async function verifyInclusionBundle(
   bundle: InclusionBundle,
   ed25519PublicKey: Uint8Array,
   slhDsaPublicKey: Uint8Array,
-): VerifyResult {
+): Promise<VerifyResult> {
   let prevRoot = EPOCH_GENESIS_ROOT;
 
   for (const e of bundle.epoch_chain ?? []) {
@@ -106,12 +106,12 @@ export function verifyInclusionBundle(
     };
     const signedBytes = canonicalJson(payload);
     if (
-      !verifyHybrid({
+      !(await verifyHybrid({
         envelope: e.signature_envelope,
         message: signedBytes,
         ed25519PublicKey,
         slhDsaPublicKey,
-      })
+      }))
     ) {
       return {
         ok: false,

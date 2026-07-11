@@ -1,12 +1,20 @@
 /**
- * Hybrid signature verifier — Ed25519 + SLH-DSA-SHA2-128f, both required.
+ * Hybrid signature verifier — Ed25519 + SPHINCS+-SHA2-128f-simple, both required.
  *
  * Verifier-only. Byte-for-byte identical to Python reference.
  *
- * Uses @noble packages (same libraries the Suzhi PQ stack uses):
- *   - @noble/curves/ed25519 for Ed25519
- *   - @noble/post-quantum/slh-dsa for SLH-DSA-SHA2-128f
+ * Uses:
+ *   - @noble/curves/ed25519 for Ed25519 (sync)
+ *   - pqclean's sphincs-sha2-128f-simple (async — WASM-backed) — same
+ *     PQClean C reference implementation that liboqs-python uses on the
+ *     server side, so signatures cross-verify byte-for-byte.
  *   - @noble/hashes/sha256 for pubkey fingerprints
+ *
+ * Note: because pqclean's verify is async (WASM boundary), verifySlhDsa
+ * and by extension verifyHybrid and verifyInclusionBundle return
+ * Promises rather than plain booleans. This is a compliance-track
+ * consumer-visible API change from the earlier draft: auditors call
+ * `await verifyInclusionBundle(...)`.
  *
  * License: MIT.
  */
@@ -14,7 +22,7 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha256.js";
 import { concatBytes } from "@noble/hashes/utils.js";
-import { slh_dsa_sha2_128f } from "@noble/post-quantum/slh-dsa";
+import pqclean from "pqclean";
 
 export const SIGNATURE_ENVELOPE_VERSION = 1;
 
@@ -23,8 +31,24 @@ export const DOMAIN_AUDIT_LOG_EPOCH_ROOT = new TextEncoder().encode(
   "world-model-mcp/audit-log/epoch-root/v1",
 );
 
-export const SLH_DSA_PUBLIC_KEY_BYTES = 32;   // slh_dsa_sha2_128f public key
-export const SLH_DSA_SIGNATURE_BYTES = 17088; // slh_dsa_sha2_128f signature
+/** liboqs / pqclean algorithm name for SPHINCS+-SHA2-128f-simple. */
+const SLH_DSA_ALG = "sphincs-sha2-128f-simple";
+
+// Read parameter sizes from pqclean once at module load so callers can
+// validate lengths before decoding.
+const _slh_alg_info = pqclean.sign.supportedAlgorithms.find(
+  (a: { name: string; publicKeySize: number; signatureSize: number }) =>
+    a.name === SLH_DSA_ALG,
+);
+if (!_slh_alg_info) {
+  throw new Error(
+    `pqclean does not expose ${SLH_DSA_ALG}. Update pqclean or the ` +
+      `SLH_DSA_ALG constant in this module.`,
+  );
+}
+
+export const SLH_DSA_PUBLIC_KEY_BYTES = _slh_alg_info.publicKeySize;
+export const SLH_DSA_SIGNATURE_BYTES = _slh_alg_info.signatureSize;
 
 export interface SignatureEnvelope {
   version: number;
@@ -46,6 +70,9 @@ export function domainSeparate(
   return concatBytes(domain, new Uint8Array([0x00]), message);
 }
 
+/**
+ * Ed25519 verify — synchronous. Fails closed on any error.
+ */
 export function verifyEd25519(
   publicKeyBytes: Uint8Array,
   message: Uint8Array,
@@ -63,25 +90,21 @@ export function verifyEd25519(
   }
 }
 
-export function verifySlhDsa(
+/**
+ * SLH-DSA verify — async because pqclean's verify traverses a WASM
+ * boundary. Fails closed on any error, including malformed input.
+ */
+export async function verifySlhDsa(
   publicKeyBytes: Uint8Array,
   message: Uint8Array,
   signature: Uint8Array,
   domain: Uint8Array = DOMAIN_AUDIT_LOG_EPOCH_ROOT,
-): boolean {
+): Promise<boolean> {
   if (signature.length !== SLH_DSA_SIGNATURE_BYTES) return false;
   if (publicKeyBytes.length !== SLH_DSA_PUBLIC_KEY_BYTES) return false;
   try {
-    // Note: @noble/post-quantum's verify signature is
-    // (publicKey, msg, sig) — different order from @noble/curves ed25519
-    // which is (sig, msg, publicKey). Caught this footgun during verifier
-    // build; both orderings are internally consistent but incompatible
-    // across the two noble packages.
-    return slh_dsa_sha2_128f.verify(
-      publicKeyBytes,
-      domainSeparate(domain, message),
-      signature,
-    );
+    const pubkey = new pqclean.sign.PublicKey(SLH_DSA_ALG, publicKeyBytes);
+    return await pubkey.verify(domainSeparate(domain, message), signature);
   } catch {
     return false;
   }
@@ -95,13 +118,15 @@ export function verifySlhDsa(
  *   - missing / non-string / null slh_dsa (attempted downgrade)
  *   - malformed hex
  *   - either signature failing to verify
+ *
+ * Async because the SLH-DSA half is async (WASM boundary in pqclean).
  */
-export function verifyHybrid(params: {
+export async function verifyHybrid(params: {
   envelope: SignatureEnvelope;
   message: Uint8Array;
   ed25519PublicKey: Uint8Array;
   slhDsaPublicKey: Uint8Array;
-}): boolean {
+}): Promise<boolean> {
   const { envelope, message, ed25519PublicKey, slhDsaPublicKey } = params;
   if (envelope.version !== SIGNATURE_ENVELOPE_VERSION) return false;
   if (typeof envelope.ed25519 !== "string") return false;
@@ -117,7 +142,7 @@ export function verifyHybrid(params: {
   }
 
   if (!verifyEd25519(ed25519PublicKey, message, edSig)) return false;
-  if (!verifySlhDsa(slhDsaPublicKey, message, slhSig)) return false;
+  if (!(await verifySlhDsa(slhDsaPublicKey, message, slhSig))) return false;
   return true;
 }
 

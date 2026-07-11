@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 from typing import Optional
 
-import pyspx.sha2_128f as _slh_dsa
+import oqs
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 
@@ -22,8 +22,14 @@ SIGNATURE_ENVELOPE_VERSION = 1
 # MUST match world-model-mcp server's DOMAIN_AUDIT_LOG_EPOCH_ROOT.
 DOMAIN_AUDIT_LOG_EPOCH_ROOT = b"world-model-mcp/audit-log/epoch-root/v1"
 
-SLH_DSA_PUBLIC_KEY_BYTES = _slh_dsa.crypto_sign_PUBLICKEYBYTES
-SLH_DSA_SIGNATURE_BYTES = _slh_dsa.crypto_sign_BYTES
+# SPHINCS+-SHA2-128f-simple per PQClean (round-3 finalized). This is the
+# same C reference that the pqclean npm TypeScript verifier reads, so
+# signatures cross-verify byte-for-byte.
+_SLH_DSA_ALG = "SPHINCS+-SHA2-128f-simple"
+_slh_probe = oqs.Signature(_SLH_DSA_ALG)
+
+SLH_DSA_PUBLIC_KEY_BYTES = _slh_probe.details["length_public_key"]
+SLH_DSA_SIGNATURE_BYTES = _slh_probe.details["length_signature"]
 
 
 def pubkey_fingerprint(public_key_bytes: bytes) -> str:
@@ -57,13 +63,14 @@ def verify_slh_dsa(
     signature: bytes,
     domain: bytes = DOMAIN_AUDIT_LOG_EPOCH_ROOT,
 ) -> bool:
-    """Verify SLH-DSA-SHA2-128f over the domain-separated message. Fails closed."""
+    """Verify SPHINCS+-SHA2-128f-simple over the domain-separated message. Fails closed."""
     if len(signature) != SLH_DSA_SIGNATURE_BYTES:
         return False
     if len(public_key_bytes) != SLH_DSA_PUBLIC_KEY_BYTES:
         return False
     try:
-        return _slh_dsa.verify(
+        verifier = oqs.Signature(_SLH_DSA_ALG)
+        return verifier.verify(
             domain_separate(domain, message), signature, public_key_bytes
         )
     except Exception:
